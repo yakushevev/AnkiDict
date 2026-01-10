@@ -3,10 +3,27 @@
 """
 import argparse
 import sys
+import os
 from pathlib import Path
 from csv_parser import CSVParser
 from tts_handler import TTSHandler
 from anki_generator import AnkiGenerator
+
+# Устанавливаем кодировку UTF-8 для консоли Windows
+if sys.platform == 'win32':
+    import io
+    # Устанавливаем переменную окружения для Python
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+    # Перенаправляем stdout и stderr с правильной кодировкой
+    if hasattr(sys.stdout, 'buffer'):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    if hasattr(sys.stderr, 'buffer'):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    # Устанавливаем кодировку консоли Windows на UTF-8
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except:
+        pass
 
 
 def main():

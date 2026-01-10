@@ -23,7 +23,11 @@ class CSVParser:
         Формат: первая_буква;произношение;иероглиф1;...;иероглиф9;слова1;...;слова5
         """
         with open(filepath, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=';')
+            # Определяем разделитель автоматически
+            first_line = f.readline()
+            f.seek(0)
+            delimiter = ';' if ';' in first_line else ','
+            reader = csv.reader(f, delimiter=delimiter)
             for row in reader:
                 if len(row) < 2:
                     continue
@@ -40,38 +44,65 @@ class CSVParser:
                 
                 # Сохраняем произношение для каждого иероглифа
                 # Все иероглифы в одной строке - это омофоны (имеют одинаковое произношение)
-                for char in characters:
-                    self.pronunciations[char] = pronunciation
-                    self.pron_to_chars[pronunciation].add(char)
+                # ВАЖНО: сохраняем омофоны только если есть хотя бы 2 иероглифа в строке
+                if len(characters) > 0:
+                    for char in characters:
+                        self.pronunciations[char] = pronunciation
+                        self.pron_to_chars[pronunciation].add(char)
                     # Сохраняем омофоны: все иероглифы из этой строки для каждого иероглифа
-                    for other_char in characters:
-                        if other_char != char:
-                            self.char_homophones[char].add(other_char)
+                    # Омофоны есть только если в строке больше одного иероглифа
+                    if len(characters) > 1:
+                        for char in characters:
+                            for other_char in characters:
+                                if other_char != char:
+                                    self.char_homophones[char].add(other_char)
                 
                 # Обрабатываем слова
+                # ВАЖНО: омофоны определяются ТОЛЬКО из полей иероглифов (characters),
+                # а не из слов! Слова могут содержать другие иероглифы, которые не являются омофонами.
                 for words_str in words_lists:
                     words = [w.strip() for w in words_str.split(',') if w.strip()]
                     for word in words:
-                        if word not in self.seen_words:
+                        # Находим иероглифы слова, которые есть в списке characters (омофонов этой строки)
+                        # Это важно: мы связываем слово только с теми иероглифами, которые явно указаны
+                        # в полях иероглифов этой строки, а не со всеми иероглифами, которые встречаются в слове
+                        word_chars = []
+                        for char in characters:
+                            if char in word:
+                                word_chars.append(char)
+                        
+                        # Если нет иероглифов из этой строки в слове, пропускаем
+                        if not word_chars:
+                            continue
+                        
+                        # Отмечаем слово как обработанное только при первом добавлении
+                        is_new_word = word not in self.seen_words
+                        if is_new_word:
                             self.seen_words.add(word)
-                            
-                            # Находим иероглифы слова
-                            word_chars = []
-                            for char in characters:
-                                if char in word:
-                                    word_chars.append(char)
-                            
-                            # Сохраняем данные слова
-                            if word not in self.words_data:
-                                self.words_data[word] = {
-                                    'pronunciation': pronunciation,
-                                    'characters': word_chars,
-                                    'all_characters': characters.copy()
-                                }
-                            
-                            # Сохраняем связь иероглиф -> слова
+                        
+                        # Сохраняем данные слова
+                        if word not in self.words_data:
+                            self.words_data[word] = {
+                                'pronunciation': pronunciation,
+                                'characters': word_chars.copy(),
+                                'all_characters': characters.copy()
+                            }
+                        else:
+                            # Если слово уже существует, добавляем новые иероглифы к существующему списку
+                            # Это важно для слов, которые встречаются в нескольких строках
+                            # Например, слово "分钟" встречается и в строке с "分", и в строке с "钟"
+                            existing_chars = set(self.words_data[word]['characters'])
                             for char in word_chars:
-                                self.char_to_words[char].add(word)
+                                if char not in existing_chars:
+                                    self.words_data[word]['characters'].append(char)
+                            # Также обновляем произношение, если оно было пустым
+                            if not self.words_data[word].get('pronunciation'):
+                                self.words_data[word]['pronunciation'] = pronunciation
+                        
+                        # Сохраняем связь иероглиф -> слова
+                        # Только для иероглифов, которые есть в characters (полях иероглифов)
+                        for char in word_chars:
+                            self.char_to_words[char].add(word)
     
     def parse_second_csv(self, filepath: str):
         """
@@ -79,7 +110,11 @@ class CSVParser:
         Формат: иероглиф;произношение;перевод (тип: значение | тип: значение)
         """
         with open(filepath, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=';')
+            # Определяем разделитель автоматически
+            first_line = f.readline()
+            f.seek(0)
+            delimiter = ';' if ';' in first_line else ','
+            reader = csv.reader(f, delimiter=delimiter)
             for row in reader:
                 if len(row) < 3:
                     continue
@@ -95,6 +130,7 @@ class CSVParser:
                 translations = self._parse_translations(translation_str)
                 
                 # Обновляем данные слова
+                # ВАЖНО: произношение из второго CSV имеет приоритет, так как там указано произношение всего слова
                 if word not in self.words_data:
                     self.words_data[word] = {
                         'pronunciation': pronunciation,
@@ -102,24 +138,19 @@ class CSVParser:
                         'all_characters': []
                     }
                 else:
-                    # Обновляем произношение если нужно
-                    if not self.words_data[word].get('pronunciation'):
-                        self.words_data[word]['pronunciation'] = pronunciation
+                    # Всегда обновляем произношение из второго CSV, так как там произношение всего слова
+                    self.words_data[word]['pronunciation'] = pronunciation
                 
                 self.words_data[word]['translations'] = translations
                 
                 # Сохраняем произношение для иероглифов
+                # НО не добавляем омофоны из второго CSV, так как там нет информации о том,
+                # какие иероглифы являются омофонами (омофоны определяются только из первого CSV)
                 for char in word:
                     if char not in self.pronunciations:
                         self.pronunciations[char] = pronunciation
                     self.pron_to_chars[pronunciation].add(char)
                     self.char_to_words[char].add(word)
-                    # Добавляем омофоны: все иероглифы с таким же произношением
-                    chars_with_same_pron = self.pron_to_chars.get(pronunciation, set())
-                    for other_char in chars_with_same_pron:
-                        if other_char != char:
-                            self.char_homophones[char].add(other_char)
-                            self.char_homophones[other_char].add(char)
     
     def _parse_translations(self, translation_str: str) -> Dict[str, List[str]]:
         """
