@@ -167,9 +167,16 @@ class AnkiGenerator:
                 if chars_with_same_pron:
                     chars_str = ', '.join(chars_with_same_pron[:10])  # Ограничиваем до 10
                     html_parts.append(f'<div class="char-pronunciation">Иероглифы с таким же звучанием: {chars_str}</div>')
-                
+                 
                 html_parts.append('</div>')
+                
+            if 'wordHomophones' in word_data and word_data['wordHomophones']: 
+                wordHomophonesStr=', '.join(word_data['wordHomophones'])
+                html_parts.append(f'<div class="char-pronunciation">Слова с таким же звучанием: {wordHomophonesStr}</div>')
             html_parts.append('</div>')
+        
+
+               
         
         return ''.join(html_parts)
     
@@ -206,6 +213,13 @@ class AnkiGenerator:
                 continue
             
             pronunciation = word_data.get('pronunciation', '')
+            
+            
+            wordHomophones = []
+            for other_word in words:
+                if other_word!= word and self.parser.all_words_data[other_word]['pronunciation']==word_data['pronunciation']:
+                    wordHomophones.append(other_word)
+            word_data['wordHomophones'] = wordHomophones
             
             # Генерируем HTML
             front_html = self.generate_front_html(word, pronunciation)
