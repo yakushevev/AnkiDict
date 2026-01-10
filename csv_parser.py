@@ -14,6 +14,7 @@ class CSVParser:
         self.pronunciations: Dict[str, str] = {}  # иероглиф -> произношение
         self.char_to_words: Dict[str, Set[str]] = defaultdict(set)  # иероглиф -> слова
         self.pron_to_chars: Dict[str, Set[str]] = defaultdict(set)  # произношение -> иероглифы
+        self.char_homophones: Dict[str, Set[str]] = defaultdict(set)  # иероглиф -> омофоны (иероглифы из той же строки)
         self.seen_words: Set[str] = set()  # для отслеживания дубликатов
     
     def parse_first_csv(self, filepath: str):
@@ -38,9 +39,14 @@ class CSVParser:
                 words_lists = [words.strip() for words in row[11:16] if words.strip()]
                 
                 # Сохраняем произношение для каждого иероглифа
+                # Все иероглифы в одной строке - это омофоны (имеют одинаковое произношение)
                 for char in characters:
                     self.pronunciations[char] = pronunciation
                     self.pron_to_chars[pronunciation].add(char)
+                    # Сохраняем омофоны: все иероглифы из этой строки для каждого иероглифа
+                    for other_char in characters:
+                        if other_char != char:
+                            self.char_homophones[char].add(other_char)
                 
                 # Обрабатываем слова
                 for words_str in words_lists:
@@ -108,6 +114,12 @@ class CSVParser:
                         self.pronunciations[char] = pronunciation
                     self.pron_to_chars[pronunciation].add(char)
                     self.char_to_words[char].add(word)
+                    # Добавляем омофоны: все иероглифы с таким же произношением
+                    chars_with_same_pron = self.pron_to_chars.get(pronunciation, set())
+                    for other_char in chars_with_same_pron:
+                        if other_char != char:
+                            self.char_homophones[char].add(other_char)
+                            self.char_homophones[other_char].add(char)
     
     def _parse_translations(self, translation_str: str) -> Dict[str, List[str]]:
         """
@@ -144,13 +156,13 @@ class CSVParser:
         """
         Возвращает разбор иероглифа:
         - слова с таким же иероглифом
-        - иероглифы с идентичным звучанием
+        - иероглифы с идентичным звучанием (омофоны из первого CSV)
         """
         words_with_char = list(self.char_to_words.get(char, set()))
-        pronunciation = self.pronunciations.get(char, '')
-        chars_with_same_pron = list(self.pron_to_chars.get(pronunciation, set()))
+        # Используем сохраненные омофоны из первого CSV (иероглифы из той же строки)
+        homophones = list(self.char_homophones.get(char, set()))
         
         return {
             'words': words_with_char,
-            'chars_with_same_pronunciation': chars_with_same_pron
+            'chars_with_same_pronunciation': homophones
         }
