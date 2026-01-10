@@ -1,0 +1,257 @@
+"""
+Модуль для генерации карточек Anki в формате .apkg.
+"""
+import genanki
+from typing import Dict, List
+from pathlib import Path
+from csv_parser import CSVParser
+from tts_handler import TTSHandler
+
+
+class AnkiGenerator:
+    """Класс для генерации карточек Anki."""
+    
+    def __init__(self, parser: CSVParser, tts_handler: TTSHandler):
+        """
+        Инициализация генератора Anki.
+        
+        Args:
+            parser: Парсер CSV файлов
+            tts_handler: Обработчик TTS
+        """
+        self.parser = parser
+        self.tts_handler = tts_handler
+        
+        # Создаем модель карточки
+        self.model = genanki.Model(
+            1607392319,  # Уникальный ID модели
+            'Chinese Dictionary Model',
+            fields=[
+                {'name': 'Word'},
+                {'name': 'Pronunciation'},
+                {'name': 'Front'},
+                {'name': 'Back'},
+                {'name': 'Audio'},
+            ],
+            templates=[
+                {
+                    'name': 'Card 1',
+                    'qfmt': '{{Front}}',
+                    'afmt': '{{FrontSide}}<hr id="answer">{{Back}}',
+                },
+            ],
+            css='''
+            .card {
+                font-family: Arial, sans-serif;
+                font-size: 20px;
+                text-align: center;
+                color: #333;
+            }
+            .word {
+                font-size: 48px;
+                font-weight: bold;
+                margin: 40px 0;
+                color: #2c3e50;
+            }
+            .pronunciation {
+                font-size: 24px;
+                color: #7f8c8d;
+                margin-top: 20px;
+            }
+            .translations {
+                text-align: left;
+                margin: 20px 0;
+            }
+            .translation-type {
+                font-weight: bold;
+                color: #3498db;
+                margin-top: 15px;
+            }
+            .translation-meaning {
+                margin-left: 20px;
+                margin-top: 5px;
+            }
+            .character-analysis {
+                text-align: left;
+                margin: 20px 0;
+                border-top: 2px solid #ecf0f1;
+                padding-top: 20px;
+            }
+            .char-item {
+                margin: 15px 0;
+            }
+            .char-title {
+                font-weight: bold;
+                font-size: 28px;
+                color: #2c3e50;
+                margin-bottom: 10px;
+            }
+            .char-words, .char-pronunciation {
+                margin-left: 20px;
+                margin-top: 5px;
+                color: #555;
+            }
+            '''
+        )
+    
+    def generate_front_html(self, word: str, pronunciation: str) -> str:
+        """
+        Генерирует HTML для лицевой стороны карточки.
+        
+        Args:
+            word: Слово
+            pronunciation: Произношение
+            
+        Returns:
+            HTML строка
+        """
+        audio_path = self.tts_handler.get_audio_path(word)
+        audio_tag = f'[sound:{Path(audio_path).name}]' if audio_path and Path(audio_path).exists() else ''
+        
+        pron_html = f'<div class="pronunciation">{pronunciation}</div>' if pronunciation else ''
+        
+        html = f'''
+        <div class="word">{word}</div>
+        {pron_html}
+        {audio_tag}
+        '''
+        return html.strip()
+    
+    def generate_back_html(self, word: str, word_data: Dict) -> str:
+        """
+        Генерирует HTML для оборотной стороны карточки.
+        
+        Args:
+            word: Слово
+            word_data: Данные о слове
+            
+        Returns:
+            HTML строка
+        """
+        html_parts = []
+        
+        # 1. Переводы
+        translations = word_data.get('translations', {})
+        if translations:
+            html_parts.append('<div class="translations">')
+            for word_type, meanings in translations.items():
+                if meanings:
+                    html_parts.append(f'<div class="translation-type">{word_type}:</div>')
+                    for meaning in meanings:
+                        if meaning.strip():
+                            html_parts.append(f'<div class="translation-meaning">• {meaning.strip()}</div>')
+            html_parts.append('</div>')
+        
+        # 2. Разбор иероглифов
+        characters = word_data.get('characters', [])
+        if characters:
+            html_parts.append('<div class="character-analysis">')
+            for char in characters:
+                analysis = self.parser.get_char_analysis(char)
+                
+                html_parts.append(f'<div class="char-item">')
+                html_parts.append(f'<div class="char-title">{char}</div>')
+                
+                # Слова с таким же иероглифом
+                words_with_char = analysis.get('words', [])
+                # Исключаем само слово из списка
+                words_with_char = [w for w in words_with_char if w != word]
+                if words_with_char:
+                    words_str = ', '.join(words_with_char[:10])  # Ограничиваем до 10 слов
+                    html_parts.append(f'<div class="char-words">Слова: {words_str}</div>')
+                
+                # Иероглифы с идентичным звучанием
+                chars_with_same_pron = analysis.get('chars_with_same_pronunciation', [])
+                # Исключаем сам иероглиф из списка
+                chars_with_same_pron = [c for c in chars_with_same_pron if c != char]
+                if chars_with_same_pron:
+                    chars_str = ', '.join(chars_with_same_pron[:10])  # Ограничиваем до 10
+                    html_parts.append(f'<div class="char-pronunciation">Иероглифы с таким же звучанием: {chars_str}</div>')
+                
+                html_parts.append('</div>')
+            html_parts.append('</div>')
+        
+        return ''.join(html_parts)
+    
+    def generate_deck(self, deck_name: str = "Chinese Dictionary", output_file: str = "chinese_dict.apkg"):
+        """
+        Генерирует колоду Anki.
+        
+        Args:
+            deck_name: Название колоды
+            output_file: Имя выходного файла
+        """
+        deck = genanki.Deck(
+            2059400110,  # Уникальный ID колоды
+            deck_name
+        )
+        
+        words = self.parser.get_all_words()
+        print(f"Генерация карточек для {len(words)} слов...")
+        
+        skipped_count = 0
+        skipped_words = []
+        
+        for i, word in enumerate(words, 1):
+            if i % 10 == 0:
+                print(f"Обработано {i}/{len(words)} слов...")
+            
+            word_data = self.parser.get_word_data(word)
+            
+            # Проверяем наличие переводов
+            translations = word_data.get('translations', {})
+            if not translations or not any(translations.values()):
+                skipped_count += 1
+                skipped_words.append(word)
+                continue
+            
+            pronunciation = word_data.get('pronunciation', '')
+            
+            # Генерируем HTML
+            front_html = self.generate_front_html(word, pronunciation)
+            back_html = self.generate_back_html(word, word_data)
+            
+            # Получаем путь к аудио
+            audio_path = self.tts_handler.get_audio_path(word)
+            audio_field = Path(audio_path).name if audio_path else ''
+            
+            # Создаем заметку
+            note = genanki.Note(
+                model=self.model,
+                fields=[
+                    word,
+                    pronunciation,
+                    front_html,
+                    back_html,
+                    audio_field
+                ]
+            )
+            
+            deck.add_note(note)
+        
+        # Добавляем аудио файлы в пакет
+        package = genanki.Package(deck)
+        audio_files = []
+        # Собираем аудио только для слов, которые были добавлены в колоду
+        added_words = [w for w in words if w not in skipped_words]
+        for word in added_words:
+            audio_path = self.tts_handler.get_audio_path(word)
+            if audio_path and Path(audio_path).exists():
+                audio_files.append(audio_path)
+        
+        if audio_files:
+            package.media_files = audio_files
+        
+        # Сохраняем колоду
+        package.write_to_file(output_file)
+        
+        # Выводим статистику
+        total_cards = len(words) - skipped_count
+        print(f"\nКолода сохранена в файл: {output_file}")
+        print(f"Сгенерировано карточек: {total_cards}")
+        if skipped_count > 0:
+            print(f"Пропущено карточек (без перевода): {skipped_count}")
+            if len(skipped_words) <= 20:
+                print(f"Пропущенные слова: {', '.join(skipped_words)}")
+            else:
+                print(f"Пропущенные слова (первые 20): {', '.join(skipped_words[:20])}...")
