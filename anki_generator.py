@@ -31,13 +31,19 @@ class AnkiGenerator:
                 {'name': 'Pronunciation'},
                 {'name': 'Front'},
                 {'name': 'Back'},
+                {'name': 'Examples'},
                 {'name': 'Audio'},
             ],
             templates=[
                 {
-                    'name': 'Card 1',
+                    'name': 'Card 1 (Front → Back)',
                     'qfmt': '{{Front}}',
-                    'afmt': '{{FrontSide}}<hr id="answer">{{Back}}',
+                    'afmt': '{{FrontSide}}<hr id="answer">{{Back}}{{Examples}}',
+                },
+                {
+                    'name': 'Card 2 (Back → Front)',
+                    'qfmt': '{{Back}}',
+                    'afmt': '{{FrontSide}}<hr id="answer">{{Front}}{{Examples}}',
                 },
             ],
             css='''
@@ -123,7 +129,6 @@ class AnkiGenerator:
         
         Args:
             word: Слово
-            word_data: Данные о слове
             
         Returns:
             HTML строка
@@ -142,6 +147,20 @@ class AnkiGenerator:
                             html_parts.append(f'<div class="translation-meaning">• {meaning.strip()}</div>')
             html_parts.append('</div>')
         
+        return ''.join(html_parts)
+    
+    def generate_examples_html(self, word: str, word_data: Dict) -> str:
+        """
+        Генерирует HTML для оборотной стороны карточки.
+        
+        Args:
+            word_data: Данные о слове
+            
+        Returns:
+            HTML строка
+        """
+        html_parts = []
+        
         # 2. Разбор иероглифов
         characters = word_data.get('characters', [])
         if characters:
@@ -158,7 +177,7 @@ class AnkiGenerator:
                 words_with_char = [w for w in words_with_char if w != word]
                 if words_with_char:
                     words_str = ', '.join(words_with_char[:10])  # Ограничиваем до 10 слов
-                    html_parts.append(f'<div class="char-words">Слова: {words_str}</div>')
+                    html_parts.append(f'<div class="char-words">Употребление: {words_str}</div>')
                 
                 # Иероглифы с идентичным звучанием
                 chars_with_same_pron = analysis.get('chars_with_same_pronunciation', [])
@@ -166,13 +185,13 @@ class AnkiGenerator:
                 chars_with_same_pron = [c for c in chars_with_same_pron if c != char]
                 if chars_with_same_pron:
                     chars_str = ', '.join(chars_with_same_pron[:10])  # Ограничиваем до 10
-                    html_parts.append(f'<div class="char-pronunciation">Иероглифы с таким же звучанием: {chars_str}</div>')
+                    html_parts.append(f'<div class="char-pronunciation">Однозвучные: {chars_str}</div>')
                  
                 html_parts.append('</div>')
                 
             if 'wordHomophones' in word_data and word_data['wordHomophones']: 
                 wordHomophonesStr=', '.join(word_data['wordHomophones'])
-                html_parts.append(f'<div class="char-pronunciation">Слова с таким же звучанием: {wordHomophonesStr}</div>')
+                html_parts.append(f'<div class="char-pronunciation">Слова, звучащие также: {wordHomophonesStr}</div>')
             html_parts.append('</div>')
         
 
@@ -224,6 +243,7 @@ class AnkiGenerator:
             # Генерируем HTML
             front_html = self.generate_front_html(word, pronunciation)
             back_html = self.generate_back_html(word, word_data)
+            examples_html = self.generate_examples_html(word, word_data)
             
             # Получаем путь к аудио
             audio_path = self.tts_handler.get_audio_path(word)
@@ -237,6 +257,7 @@ class AnkiGenerator:
                     pronunciation,
                     front_html,
                     back_html,
+                    examples_html,
                     audio_field
                 ]
             )
