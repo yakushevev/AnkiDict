@@ -23,6 +23,7 @@ class TTSHandler:
         self.audio_dir.mkdir(exist_ok=True)
     
     def get_audio_path(self, text: str) -> str:
+        #return ""
         """
         Генерирует или возвращает путь к аудио файлу для текста.
         

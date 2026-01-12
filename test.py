@@ -35,21 +35,19 @@ def main():
     print(f"   Иероглифы по произношению: {dict(parser.char_to_pron)}")
     print(f"   Слова по иероглифам: {dict(parser.char_to_words)}")
     
-    # Тестирование получения анализа для конкретных иероглифов
-    print("\n3. Анализ иероглифов:")
-    
-    test_chars = ['准', '备', '历', '史']
-    for char in test_chars:
-        analysis = parser.get_char_analysis(char)
-        print(f"\n   Для иероглифа '{char}':")
-        print(f"     Слова с этим иероглифом: {analysis['words']}")
-        print(f"     Омофоны (те же строки): {analysis['chars_with_same_pronunciation']}")
-
-    # Примеры работы с конкретными словами
+   # Примеры работы с конкретными словами
     print("\n4. Данные по словам:")
     
     test_words = ['准备', '历史']
     for word in test_words:
+        
+        for char in set(word):
+            analysis = parser.get_char_analysis(char, word)
+            print(f"\n   Для иероглифа '{char}':")
+            print(f"     Слова с этим иероглифом: {analysis['words']}")
+            print(f"     Омофоны (те же строки): {analysis['chars_with_same_pronunciation']}")
+
+        
         data = parser.get_word_data(word)
         print(f"\n   Слово '{word}':")
         if data:

@@ -2,6 +2,7 @@
 Модуль для генерации карточек Anki в формате .apkg.
 """
 import genanki
+import csv
 from typing import Dict, List
 from pathlib import Path
 from csv_parser import CSVParser
@@ -21,6 +22,10 @@ class AnkiGenerator:
         """
         self.parser = parser
         self.tts_handler = tts_handler
+        
+        # Списки для отслеживания слов без перевода и ошибок обработки
+        self.words_without_translation = []
+        self.processing_errors = []
         
         # Создаем модель карточки
         self.model = genanki.Model(
@@ -166,7 +171,7 @@ class AnkiGenerator:
         if characters:
             html_parts.append('<div class="character-analysis">')
             for char in characters:
-                analysis = self.parser.get_char_analysis(char)
+                analysis = self.parser.get_char_analysis(char, word)
                 
                 html_parts.append(f'<div class="char-item">')
                 html_parts.append(f'<div class="char-title">{char}</div>')
@@ -194,11 +199,44 @@ class AnkiGenerator:
                 html_parts.append(f'<div class="char-pronunciation">Слова, звучащие также: {wordHomophonesStr}</div>')
             html_parts.append('</div>')
         
-
-               
+                
         
         return ''.join(html_parts)
     
+    def add_word_without_translation(self, word: str, pronunciation: str = ""):
+        """Добавляет слово без перевода в список."""
+        self.words_without_translation.append({
+            'word': word,
+            'pronunciation': pronunciation
+        })
+
+    def add_processing_error(self, word: str, error: str):
+        """Добавляет слово с ошибкой обработки в список."""
+        self.processing_errors.append({
+            'word': word,
+            'error': error
+        })
+
+    def generate_words_without_translation_csv(self, filename: str = "words_without_translation.csv"):
+        """Генерирует CSV файл для слов без перевода."""
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['word', 'pronunciation']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for item in self.words_without_translation:
+                writer.writerow(item)
+        print(f"Файл '{filename}' сгенерирован с {len(self.words_without_translation)} словами без перевода.")
+
+    def generate_processing_errors_csv(self, filename: str = "processing_errors.csv"):
+        """Генерирует CSV файл для слов с ошибками обработки."""
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['word', 'error']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for item in self.processing_errors:
+                writer.writerow(item)
+        print(f"Файл '{filename}' сгенерирован с {len(self.processing_errors)} ошибками обработки.")
+
     def generate_deck(self, deck_name: str = "Chinese Dictionary", output_file: str = "chinese_dict.apkg"):
         """
         Генерирует колоду Anki.
@@ -229,6 +267,9 @@ class AnkiGenerator:
             if not translations or not any(translations.values()):
                 skipped_count += 1
                 skipped_words.append(word)
+                # Добавляем слово без перевода в список
+                pronunciation = word_data.get('pronunciation', '')
+                self.add_word_without_translation(word, pronunciation)
                 continue
             
             pronunciation = word_data.get('pronunciation', '')
@@ -247,6 +288,7 @@ class AnkiGenerator:
             
             # Получаем путь к аудио
             audio_path = self.tts_handler.get_audio_path(word)
+            audio_path = ''
             audio_field = Path(audio_path).name if audio_path else ''
             
             # Создаем заметку
@@ -290,3 +332,7 @@ class AnkiGenerator:
                 print(f"Пропущенные слова: {', '.join(skipped_words)}")
             else:
                 print(f"Пропущенные слова (первые 20): {', '.join(skipped_words[:20])}...")
+        
+        # Генерируем CSV файлы
+        self.generate_words_without_translation_csv()
+        self.generate_processing_errors_csv()

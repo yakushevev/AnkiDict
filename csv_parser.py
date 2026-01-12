@@ -20,6 +20,9 @@ class CSVParser:
                 
         # Словарь: иероглиф -> список слов, содержащих этот иероглиф
         self.char_to_words: Dict[str, Set[str]] = defaultdict(set)
+        
+        # Словарь: слово -> иероглиф -> произношение (для отслеживания конкретного произношения иероглифа в слове)
+        self.word_char_pronunciation: Dict[str, Dict[str, str]] = defaultdict(dict)
 
     def parse_first_csv(self, filepath: str):
         """
@@ -67,20 +70,15 @@ class CSVParser:
                                 if char not in [',', '.', '!', ';','-','?']:
                                     if char not in self.all_words_data[word]['characters']:
                                         self.all_words_data[word]['characters'].append(char)
-                        #else:
-                            # Обновляем произношение, если оно было пустым
-                            #if not self.all_words_data[word].get('pronunciation'):
-                            #    self.all_words_data[word]['pronunciation'] = pronunciation
-                            # Добавляем новые иероглифы к существующему списку
-                        #    existing_chars = set(self.all_words_data[word]['characters'])
-                        #    for char in characters:
-                        #        if char not in existing_chars:
-                        #            self.all_words_data[word]['characters'].append(char)
                         
-                        # Сохраняем связь иероглиф -> слова
-                        for char in list(word):
+                        # Сохраняем связь иероглиф -> слова и отслеживаем произношение каждого иероглифа в слове
+                        for char in characters:  # Только иероглифы из текущей строки (которые имеют это произношение)
                             if word not in self.char_to_words[char]:
                                 self.char_to_words[char].add(word)
+                            # Отслеживаем какое произношение используется для каждого иероглифа в слове
+                            # Устанавливаем произношение для иероглифа в слове, если иероглиф из текущей строки присутствует в слове
+                            if char in word:  # Проверяем, что иероглиф из текущей строки действительно есть в слове
+                                self.word_char_pronunciation[word][char] = pronunciation
 
     def parse_second_csv(self, filepath: str):
         """
@@ -153,7 +151,7 @@ class CSVParser:
         """Возвращает список всех уникальных слов."""
         return list(self.all_words_data.keys())
 
-    def get_char_analysis(self, char: str) -> Dict:
+    def get_char_analysis(self, char: str, word: str = None) -> Dict:
         """
         Возвращает разбор иероглифа:
         - слова с таким же иероглифом
@@ -163,11 +161,22 @@ class CSVParser:
         # Используем сохраненные омофоны
         
         homophones = []
-        for pron in self.char_to_pron.get(char, set()):
-            for homophone in self.pron_to_chars.get(pron, set()):
-                if homophone not in homophones:
-                    homophones.append(homophone )
-      
+        
+        # Если указано слово, ищем только омофоны с тем же произношением, что и в слове
+        if word and word in self.word_char_pronunciation and char in self.word_char_pronunciation[word]:
+            # Получаем произношение иероглифа в конкретном слове
+            char_pronunciation = self.word_char_pronunciation[word][char]
+            # Ищем только иероглифы с этим же произношением
+            for homophone in self.pron_to_chars.get(char_pronunciation, set()):
+                if homophone not in homophones and homophone != char:
+                    homophones.append(homophone)
+        else:
+            # Старое поведение: показываем все омофоны
+            for pron in self.char_to_pron.get(char, set()):
+                for homophone in self.pron_to_chars.get(pron, set()):
+                    if homophone not in homophones:
+                        homophones.append(homophone )
+       
         return {
             'words': words_with_char,
             'chars_with_same_pronunciation': homophones
