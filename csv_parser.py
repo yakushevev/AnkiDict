@@ -49,8 +49,9 @@ class CSVParser:
                 
                 # Сохраняем произношение для каждого иероглифа
                 for char in characters:
-                    if (pronunciation not in self.char_to_pron[char]): self.char_to_pron[char].append(pronunciation)
-                    if (char not in self.pron_to_chars[pronunciation]): self.pron_to_chars[pronunciation].append(char)
+                    if char not in [',', '.', '!', ';','-','?']:
+                        if (pronunciation not in self.char_to_pron[char]): self.char_to_pron[char].append(pronunciation)
+                        if (char not in self.pron_to_chars[pronunciation]): self.pron_to_chars[pronunciation].append(char)
 
                 # Обрабатываем слова
                 for words_str in words_lists:
@@ -63,8 +64,9 @@ class CSVParser:
                                 'characters':  []
                             }
                             for char in list(word):
-                                if char not in self.all_words_data[word]['characters']:
-                                    self.all_words_data[word]['characters'].append(char)
+                                if char not in [',', '.', '!', ';','-','?']:
+                                    if char not in self.all_words_data[word]['characters']:
+                                        self.all_words_data[word]['characters'].append(char)
                         #else:
                             # Обновляем произношение, если оно было пустым
                             #if not self.all_words_data[word].get('pronunciation'):

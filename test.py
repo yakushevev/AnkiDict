@@ -38,7 +38,7 @@ def main():
     # Тестирование получения анализа для конкретных иероглифов
     print("\n3. Анализ иероглифов:")
     
-    test_chars = ['分', '钟', '束']
+    test_chars = ['准', '备', '历', '史']
     for char in test_chars:
         analysis = parser.get_char_analysis(char)
         print(f"\n   Для иероглифа '{char}':")
@@ -48,7 +48,7 @@ def main():
     # Примеры работы с конкретными словами
     print("\n4. Данные по словам:")
     
-    test_words = ['分钟', '束']
+    test_words = ['准备', '历史']
     for word in test_words:
         data = parser.get_word_data(word)
         print(f"\n   Слово '{word}':")
