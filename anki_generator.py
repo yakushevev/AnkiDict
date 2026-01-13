@@ -3,6 +3,7 @@
 """
 import genanki
 import csv
+import hashlib
 from typing import Dict, List
 from pathlib import Path
 from csv_parser import CSVParser
@@ -292,6 +293,10 @@ class AnkiGenerator:
             audio_field = Path(audio_path).name if audio_path else ''
             
             # Создаем заметку
+            # Генерируем GUID на основе содержимого карточки для предотвращения дубликатов
+            guid_content = f"{word}|{pronunciation}|{front_html}|{back_html}|{examples_html}"
+            guid = hashlib.md5(guid_content.encode('utf-8')).hexdigest()
+            
             note = genanki.Note(
                 model=self.model,
                 fields=[
@@ -301,7 +306,8 @@ class AnkiGenerator:
                     back_html,
                     examples_html,
                     audio_field
-                ]
+                ],
+                guid=guid
             )
             
             deck.add_note(note)
