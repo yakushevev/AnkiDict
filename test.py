@@ -38,15 +38,8 @@ def main():
    # Примеры работы с конкретными словами
     print("\n4. Данные по словам:")
     
-    test_words = ['准备', '历史']
+    test_words = ['准备', '北边']
     for word in test_words:
-        
-        for char in set(word):
-            analysis = parser.get_char_analysis(char, word)
-            print(f"\n   Для иероглифа '{char}':")
-            print(f"     Слова с этим иероглифом: {analysis['words']}")
-            print(f"     Омофоны (те же строки): {analysis['chars_with_same_pronunciation']}")
-
         
         data = parser.get_word_data(word)
         print(f"\n   Слово '{word}':")
@@ -57,6 +50,12 @@ def main():
         else:
             print(f"     Данные не найдены")
         
+        for char in set(word):
+            analysis = parser.get_char_analysis(char, word)
+            print(f"\n   Для иероглифа '{char}':")
+            print(f"     Слова с этим иероглифом: {analysis['words']}")
+            print(f"     Омофоны (те же строки): {analysis['chars_with_same_pronunciation']}")
+
 
 if __name__ == "__main__":
     main()

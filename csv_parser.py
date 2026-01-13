@@ -70,11 +70,12 @@ class CSVParser:
                                 if char not in [',', '.', '!', ';','-','?']:
                                     if char not in self.all_words_data[word]['characters']:
                                         self.all_words_data[word]['characters'].append(char)
+                                        
+                                    if word not in self.char_to_words[char]:
+                                        self.char_to_words[char].add(word)
                         
                         # Сохраняем связь иероглиф -> слова и отслеживаем произношение каждого иероглифа в слове
                         for char in characters:  # Только иероглифы из текущей строки (которые имеют это произношение)
-                            if word not in self.char_to_words[char]:
-                                self.char_to_words[char].add(word)
                             # Отслеживаем какое произношение используется для каждого иероглифа в слове
                             # Устанавливаем произношение для иероглифа в слове, если иероглиф из текущей строки присутствует в слове
                             if char in word:  # Проверяем, что иероглиф из текущей строки действительно есть в слове
@@ -157,7 +158,11 @@ class CSVParser:
         - слова с таким же иероглифом
         - иероглифы с идентичным звучанием (омофоны)
         """
-        words_with_char = list(self.char_to_words.get(char, set()))
+        words_with_char = []
+        for word_with_char in self.char_to_words.get(char, set()):
+            if word_with_char != word:
+                words_with_char.append(word_with_char )
+        
         # Используем сохраненные омофоны
         
         homophones = []
