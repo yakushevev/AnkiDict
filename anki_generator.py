@@ -96,9 +96,17 @@ class AnkiGenerator:
                 font-weight: bold;
                 font-size: 28px;
                 color: #2c3e50;
-                margin-bottom: 10px;
+                display: inline-block;
+                margin-right: 15px;
             }
-            .char-words, .char-pronunciation {
+            .char-pronunciation-inline {
+                display: inline-block;
+                font-size: 20px;
+                color: #7f8c8d;
+                font-style: italic;
+                vertical-align: bottom;
+            }
+            .char-words {
                 margin-left: 20px;
                 margin-top: 5px;
                 color: #555;
@@ -175,7 +183,14 @@ class AnkiGenerator:
                 analysis = self.parser.get_char_analysis(char, word)
                 
                 html_parts.append(f'<div class="char-item">')
-                html_parts.append(f'<div class="char-title">{char}</div>')
+                
+                # Формируем строку с заголовком иероглифа и транскрипциями в одной строке
+                pronunciations = analysis.get('pronunciation', [])
+                if pronunciations:
+                    pron_str = ', '.join(pronunciations)
+                    html_parts.append(f'<div class="char-title">{char}</div><div class="char-pronunciation-inline">[{pron_str}]</div>')
+                else:
+                    html_parts.append(f'<div class="char-title">{char}</div>')
                 
                 # Слова с таким же иероглифом
                 words_with_char = analysis.get('words', [])

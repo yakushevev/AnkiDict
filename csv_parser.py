@@ -183,6 +183,7 @@ class CSVParser:
                         homophones.append(homophone )
        
         return {
+            'pronunciation': self.char_to_pron[char].copy(),
             'words': words_with_char,
             'chars_with_same_pronunciation': homophones
         }
