@@ -58,40 +58,71 @@ class AnkiGenerator:
                 font-size: 20px;
                 text-align: center;
                 color: #333;
+                background-color: #fff;
             }
+            
+            /* Стили для темной темы */
+            .card.night_mode {
+                color: #f0f0f0;
+                background-color: #333;
+            }
+            
             .word {
                 font-size: 48px;
                 font-weight: bold;
                 margin: 40px 0;
                 color: #2c3e50;
             }
+            
+            .night_mode .word {
+                color: #fff;
+            }
+            
             .pronunciation {
                 font-size: 24px;
                 color: #7f8c8d;
                 margin-top: 20px;
             }
+            
+            .night_mode .pronunciation {
+                color: #bbb;
+            }
+            
             .translations {
                 text-align: left;
                 margin: 20px 0;
             }
+            
             .translation-type {
                 font-weight: bold;
                 color: #3498db;
                 margin-top: 15px;
             }
+            
+            .night_mode .translation-type {
+                color: #5dade2;
+            }
+            
             .translation-meaning {
                 margin-left: 20px;
                 margin-top: 5px;
             }
+            
             .character-analysis {
                 text-align: left;
                 margin: 20px 0;
                 border-top: 2px solid #ecf0f1;
                 padding-top: 20px;
             }
+            
+            .night_mode .character-analysis {
+                border-top: 2px solid #555;
+            }
+            
             .char-item {
                 margin: 15px 0;
             }
+            
             .char-title {
                 font-weight: bold;
                 font-size: 28px;
@@ -99,6 +130,11 @@ class AnkiGenerator:
                 display: inline-block;
                 margin-right: 15px;
             }
+            
+            .night_mode .char-title {
+                color: #fff;
+            }
+            
             .char-pronunciation-inline {
                 display: inline-block;
                 font-size: 20px;
@@ -106,10 +142,29 @@ class AnkiGenerator:
                 font-style: italic;
                 vertical-align: bottom;
             }
+            
+            .night_mode .char-pronunciation-inline {
+                color: #bbb;
+            }
+            
             .char-words {
                 margin-left: 20px;
                 margin-top: 5px;
                 color: #555;
+            }
+            
+            .night_mode .char-words {
+                color: #ccc;
+            }
+            
+            .char-pronunciation {
+                margin-left: 20px;
+                margin-top: 5px;
+                color: #7f8c8d;
+            }
+            
+            .night_mode .char-pronunciation {
+                color: #bbb;
             }
             '''
         )
@@ -253,14 +308,67 @@ class AnkiGenerator:
                 writer.writerow(item)
         print(f"Файл '{filename}' сгенерирован с {len(self.processing_errors)} ошибками обработки.")
 
-    def generate_deck(self, deck_name: str = "Chinese Dictionary", output_file: str = "chinese_dict.apkg"):
+    def generate_deck(self, deck_name: str = "Chinese Dictionary", output_file: str = "chinese_dict.apkg", card_types: List[str] = None):
         """
         Генерирует колоду Anki.
         
         Args:
             deck_name: Название колоды
             output_file: Имя выходного файла
+            card_types: Типы карточек для генерации (front_to_back, back_to_front)
         """
+        if card_types is None:
+            card_types = ['front_to_back', 'back_to_front']
+        
+        # Создаем отдельные модели для каждого типа карточек
+        models = {}
+        
+        if 'front_to_back' in card_types:
+            front_to_back_model = genanki.Model(
+                1607392320,  # Уникальный ID модели для front_to_back
+                'Chinese Dictionary Model (Front to Back)',
+                fields=[
+                    {'name': 'Word'},
+                    {'name': 'Pronunciation'},
+                    {'name': 'Front'},
+                    {'name': 'Back'},
+                    {'name': 'Examples'},
+                    {'name': 'Audio'},
+                ],
+                templates=[
+                    {
+                        'name': 'Card 1 (Front → Back)',
+                        'qfmt': '{{Front}}',
+                        'afmt': '{{FrontSide}}<hr id="answer">{{Back}}{{Examples}}',
+                    },
+                ],
+                css=self.model.css
+            )
+            models['front_to_back'] = front_to_back_model
+        
+        if 'back_to_front' in card_types:
+            back_to_front_model = genanki.Model(
+                1607392321,  # Уникальный ID модели для back_to_front
+                'Chinese Dictionary Model (Back to Front)',
+                fields=[
+                    {'name': 'Word'},
+                    {'name': 'Pronunciation'},
+                    {'name': 'Front'},
+                    {'name': 'Back'},
+                    {'name': 'Examples'},
+                    {'name': 'Audio'},
+                ],
+                templates=[
+                    {
+                        'name': 'Card 2 (Back → Front)',
+                        'qfmt': '{{Back}}',
+                        'afmt': '{{FrontSide}}<hr id="answer">{{Front}}{{Examples}}',
+                    },
+                ],
+                css=self.model.css
+            )
+            models['back_to_front'] = back_to_front_model
+        
         deck = genanki.Deck(
             2059400110,  # Уникальный ID колоды
             deck_name
@@ -312,8 +420,22 @@ class AnkiGenerator:
             guid_content = f"{word}|{pronunciation}|{front_html}|{back_html}|{examples_html}"
             guid = hashlib.md5(guid_content.encode('utf-8')).hexdigest()
             
+            # Выбираем модель в зависимости от типа карточки
+            if 'front_to_back' in card_types and 'back_to_front' in card_types:
+                # Если генерируем оба типа карточек, используем стандартную модель
+                note_model = self.model
+            elif 'front_to_back' in card_types:
+                # Если генерируем только прямые карточки
+                note_model = models['front_to_back']
+            elif 'back_to_front' in card_types:
+                # Если генерируем только обратные карточки
+                note_model = models['back_to_front']
+            else:
+                # По умолчанию используем стандартную модель
+                note_model = self.model
+            
             note = genanki.Note(
-                model=self.model,
+                model=note_model,
                 fields=[
                     word,
                     pronunciation,

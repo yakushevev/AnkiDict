@@ -98,9 +98,21 @@ def main():
     # Генерируем колоду Anki
     print("\nГенерация колоды Anki...")
     anki_generator = AnkiGenerator(csv_parser, tts_handler)
+    
+    # Генерируем прямой словарь
+    front_to_back_file = args.output.replace('.apkg', '_front_to_back.apkg') if args.output.endswith('.apkg') else args.output + '_front_to_back.apkg'
     anki_generator.generate_deck(
-        deck_name=args.deck_name,
-        output_file=args.output
+        deck_name=f"{args.deck_name} (Front to Back)",
+        output_file=front_to_back_file,
+        card_types=['front_to_back']
+    )
+    
+    # Генерируем обратный словарь
+    back_to_front_file = args.output.replace('.apkg', '_back_to_front.apkg') if args.output.endswith('.apkg') else args.output + '_back_to_front.apkg'
+    anki_generator.generate_deck(
+        deck_name=f"{args.deck_name} (Back to Front)",
+        output_file=back_to_front_file,
+        card_types=['back_to_front']
     )
     
     print("\nГотово!")
