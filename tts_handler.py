@@ -5,7 +5,8 @@ import os
 from pathlib import Path
 from gtts import gTTS
 import hashlib
-
+import threading
+import time
 
 class TTSHandler:
     """Класс для обработки TTS (Text-to-Speech)."""
@@ -43,9 +44,34 @@ class TTSHandler:
         
         # Генерируем новый аудио файл
         try:
-            tts = gTTS(text=text, lang=self.lang, slow=False)
-            tts.save(str(audio_path))
-            return str(audio_path)
+            # Создаем событие для синхронизации
+            completion_event = threading.Event()
+            generation_error = None
+            
+            def generate_audio():
+                nonlocal generation_error
+                try:
+                    tts = gTTS(text=text, lang=self.lang, slow=False)
+                    tts.save(str(audio_path))
+                except Exception as e:
+                    generation_error = e
+                finally:
+                    completion_event.set()
+            
+            # Запускаем генерацию в отдельном потоке
+            thread = threading.Thread(target=generate_audio)
+            thread.daemon = True
+            thread.start()
+            
+            # Ожидаем завершения с таймаутом 3 секунды
+            if completion_event.wait(timeout=3.0):
+                if generation_error:
+                    raise generation_error
+                return str(audio_path)
+            else:
+                # Таймаут превышен
+                print(f"Таймаут при генерации аудио для '{text}': превышено время ожидания 3 секунды")
+                return ""
         except Exception as e:
             print(f"Ошибка при генерации аудио для '{text}': {e}")
             return ""
