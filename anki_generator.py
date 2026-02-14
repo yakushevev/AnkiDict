@@ -64,7 +64,6 @@ class AnkiGenerator:
             /* Стили для темной темы */
             .card.night_mode {
                 color: #f0f0f0;
-                background-color: #333;
             }
             
             .word {
@@ -85,7 +84,7 @@ class AnkiGenerator:
             }
             
             .night_mode .pronunciation {
-                color: #bbb;
+                color: #777;
             }
             
             .translations {
